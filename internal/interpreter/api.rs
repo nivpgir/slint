@@ -974,11 +974,12 @@ impl ComponentHandle for ComponentInstance {
         comp.borrow_instance().window().hide();
     }
 
-    fn run(&self) {
+    fn run(&self) -> i32 {
         self.show();
-        i_slint_backend_selector::backend()
+        let result = i_slint_backend_selector::backend()
             .run_event_loop(i_slint_core::backend::EventLoopQuitBehavior::QuitOnLastWindowClosed);
         self.hide();
+        result
     }
 
     fn window(&self) -> &Window {

@@ -24,9 +24,9 @@ pub unsafe extern "C" fn slint_windowrc_init(out: *mut WindowRcOpaque) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn slint_run_event_loop() {
+pub unsafe extern "C" fn slint_run_event_loop() -> i32 {
     crate::backend()
-        .run_event_loop(i_slint_core::backend::EventLoopQuitBehavior::QuitOnLastWindowClosed);
+        .run_event_loop(slint_corelib::backend::EventLoopQuitBehavior::QuitOnLastWindowClosed)
 }
 
 /// Will execute the given functor in the main thread
@@ -57,8 +57,8 @@ pub unsafe extern "C" fn slint_post_event(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn slint_quit_event_loop() {
-    crate::backend().quit_event_loop();
+pub unsafe extern "C" fn slint_quit_event_loop(exit_code: i32) {
+    crate::backend().quit_event_loop(exit_code);
 }
 
 #[no_mangle]

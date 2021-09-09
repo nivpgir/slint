@@ -937,7 +937,7 @@ struct VersionCheckHelper
 /// Enters the main event loop. This is necessary in order to receive
 /// events from the windowing system in order to render to the screen
 /// and react to user input.
-inline void run_event_loop()
+inline int run_event_loop()
 {
     private_api::assert_main_thread();
     cbindgen_private::slint_run_event_loop();
@@ -947,9 +947,9 @@ inline void run_event_loop()
 /// to be called from callbacks triggered by the UI. After calling the function,
 /// it will return immediately and once control is passed back to the event loop,
 /// the initial call to slint::run_event_loop() will return.
-inline void quit_event_loop()
+inline void quit_event_loop(int error_code = 0)
 {
-    cbindgen_private::slint_quit_event_loop();
+    cbindgen_private::slint_quit_event_loop(error_code);
 }
 
 /// Adds the specified functor to an internal queue, notifies the event loop to wake up.

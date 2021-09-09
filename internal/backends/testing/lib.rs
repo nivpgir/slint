@@ -24,11 +24,11 @@ impl i_slint_core::backend::Backend for TestingBackend {
         Window::new(|_| Rc::new(TestingWindow::default()))
     }
 
-    fn run_event_loop(&'static self, _behavior: i_slint_core::backend::EventLoopQuitBehavior) {
+    fn run_event_loop(&'static self, _behavior: i_slint_core::backend::EventLoopQuitBehavior) -> i32 {
         unimplemented!("running an event loop with the testing backend");
     }
 
-    fn quit_event_loop(&'static self) {}
+    fn quit_event_loop(&'static self, _exit_code: i32) {}
 
     fn register_font_from_memory(
         &'static self,

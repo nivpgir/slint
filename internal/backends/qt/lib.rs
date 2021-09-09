@@ -161,24 +161,20 @@ impl i_slint_core::backend::Backend for Backend {
             // Schedule any timers with Qt that were set up before this event loop start.
             crate::qt_window::timer_event();
             use cpp::cpp;
-            cpp! {unsafe [quit_on_last_window_closed as "bool"] {
+            cpp! {unsafe [quit_on_last_window_closed as "bool"] -> i32 as "int" {
                 ensure_initialized(true);
                 qApp->setQuitOnLastWindowClosed(quit_on_last_window_closed);
-                qApp->exec();
+                return qApp->exec();
             } }
-        };
+        }
     }
 
-    fn quit_event_loop(&'static self) {
+    fn quit_event_loop(&'static self, _exit_code: i32) {
         #[cfg(not(no_qt))]
         {
             use cpp::cpp;
-            cpp! {unsafe [] {
-                // Use a quit event to avoid qApp->quit() calling
-                // [NSApp terminate:nil] and us never returning from the
-                // event loop - slint-viewer relies on the ability to
-                // return from run().
-                QCoreApplication::postEvent(qApp, new QEvent(QEvent::Quit));
+            cpp! {unsafe [_exit_code as "int"] {
+                qApp->exit(_exit_code);
             } }
         };
     }

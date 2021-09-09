@@ -99,7 +99,7 @@ fn main() -> Result<()> {
         CURRENT_INSTANCE.with(|current| current.replace(Some(component.clone_strong())));
     }
 
-    component.run();
+    let result = component.run();
 
     if let Some(data_path) = args.save_data {
         let mut obj = serde_json::Map::new();
@@ -137,7 +137,8 @@ fn main() -> Result<()> {
         }
     }
 
-    std::process::exit(EXIT_CODE.load(std::sync::atomic::Ordering::Relaxed))
+    // std::process::exit(EXIT_CODE.load(std::sync::atomic::Ordering::Relaxed))
+    std::process::exit(result)
 }
 
 fn init_compiler(
