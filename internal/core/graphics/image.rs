@@ -235,6 +235,11 @@ pub struct StaticTextures {
     pub textures: Slice<'static, StaticTexture>,
 }
 
+#[allow(unsafe_code)]
+unsafe impl Send for StaticTextures {}
+#[allow(unsafe_code)]
+unsafe impl Sync for StaticTextures {}
+
 /// A resource is a reference to binary data, for example images. They can be accessible on the file
 /// system or embedded in the resulting binary. Or they might be URLs to a web server and a downloaded
 /// is necessary before they can be used.
@@ -278,6 +283,12 @@ impl ImageInner {
 impl<'a> From<&'a Image> for &'a ImageInner {
     fn from(other: &'a Image) -> Self {
         &other.0
+    }
+}
+
+impl From<&'static StaticTextures> for ImageInner {
+    fn from(textures: &'static StaticTextures) -> Self {
+        Self::StaticTextures(textures)
     }
 }
 
