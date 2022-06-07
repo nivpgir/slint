@@ -141,14 +141,4 @@ impl i_slint_core::backend::Backend for Backend {
             });
         }
     }
-
-    fn image_size(&'static self, image: &Image) -> IntSize {
-        IMAGE_CACHE.with(|image_cache| {
-            image_cache
-                .borrow_mut()
-                .load_image_resource(image.into())
-                .and_then(|image| image.size())
-                .unwrap_or_default()
-        })
-    }
 }

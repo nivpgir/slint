@@ -3,6 +3,30 @@
 
 #![cfg(feature = "svg")]
 
+use alloc::rc::Rc;
+
+#[derive(Clone)]
+pub struct ParsedSVG(Rc<usvg::Tree>);
+
+impl core::fmt::Debug for ParsedSVG {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_tuple("ParsedSVG").finish()
+    }
+}
+
+impl PartialEq for ParsedSVG {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl ParsedSVG {
+    pub fn size(&self) -> crate::graphics::IntSize {
+        let size = self.0.svg_node().size.to_screen_size();
+        [size.width(), size.height()].into()
+    }
+}
+
 fn with_svg_options<T>(callback: impl FnOnce(usvg::OptionsRef<'_>) -> T) -> T {
     // TODO: When the font db cache is a feature in corelib, use it:
     /*
@@ -21,23 +45,27 @@ fn with_svg_options<T>(callback: impl FnOnce(usvg::OptionsRef<'_>) -> T) -> T {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn load_from_path(path: &std::path::Path) -> Result<usvg::Tree, std::io::Error> {
+pub fn load_from_path(path: &std::path::Path) -> Result<ParsedSVG, std::io::Error> {
     let svg_data = std::fs::read(path)?;
 
     with_svg_options(|options| {
         usvg::Tree::from_data(&svg_data, &options)
+            .map(|svg| ParsedSVG(svg.into()))
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     })
 }
 
-pub fn load_from_data(slice: &[u8]) -> Result<usvg::Tree, usvg::Error> {
-    with_svg_options(|options| usvg::Tree::from_data(slice, &options))
+pub fn load_from_data(slice: &[u8]) -> Result<ParsedSVG, usvg::Error> {
+    with_svg_options(|options| {
+        usvg::Tree::from_data(slice, &options).map(|svg| ParsedSVG(svg.into()))
+    })
 }
 
 pub fn render(
-    tree: &usvg::Tree,
+    svg: &ParsedSVG,
     size: euclid::default::Size2D<u32>,
 ) -> Result<image::DynamicImage, usvg::Error> {
+    let tree = &*svg.0;
     // resvg doesn't support scaling to width/height, just fit to width.
     // FIXME: the fit should actually depends on the image-fit property
     let fit = usvg::FitTo::Width(size.width);

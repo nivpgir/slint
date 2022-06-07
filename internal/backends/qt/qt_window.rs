@@ -985,6 +985,7 @@ pub(crate) fn load_image_from_resource(
             return Some(pixmap);
         }
         ImageInner::StaticTextures { .. } => todo!(),
+        ImageInner::Svg { .. } => unimplemented!(),
     };
 }
 
@@ -1025,21 +1026,6 @@ fn adjust_to_image_fit(
             }
         }
     };
-}
-
-/// Return true if this image is a SVG that is scalable
-fn is_svg(resource: &ImageInner) -> bool {
-    match resource {
-        ImageInner::None => false,
-        // TODO: match SVG imageinner type
-        //ImageInner::EmbeddedData { format, .. } => {
-        //    format.as_slice() == b"svg" || format.as_slice() == b"svgz"
-        //}
-        ImageInner::EmbeddedImage { path, .. } => {
-            path.as_str().ends_with(".svg") || path.as_str().ends_with(".svgz")
-        }
-        ImageInner::StaticTextures { .. } => false,
-    }
 }
 
 impl QtItemRenderer<'_> {

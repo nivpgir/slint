@@ -67,8 +67,6 @@ pub trait Backend: Send + Sync {
     /// Send an user event to from another thread that should be run in the GUI event loop
     fn post_event(&'static self, event: Box<dyn FnOnce() + Send>);
 
-    fn image_size(&'static self, image: &Image) -> IntSize;
-
     fn duration_since_start(&'static self) -> core::time::Duration {
         #[cfg(feature = "std")]
         {

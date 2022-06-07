@@ -169,6 +169,7 @@ impl CachedImage {
     pub fn new_from_resource(resource: &ImageInner) -> Option<Self> {
         match resource {
             ImageInner::None => None,
+            ImageInner::Svg { .. } => unimplemented!(),
             ImageInner::EmbeddedImage { buffer, .. } => {
                 Some(Self(RefCell::new(ImageData::EmbeddedImage(buffer.clone()))))
             }
@@ -470,6 +471,7 @@ impl ImageCacheKey {
             ImageInner::None => return None,
             ImageInner::EmbeddedImage { .. } => return None,
             ImageInner::StaticTextures { .. } => return None,
+            ImageInner::Svg { .. } => return None,
         })
     }
 }

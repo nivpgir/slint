@@ -437,18 +437,6 @@ mod the_backend {
             self.with_inner(|inner| inner.post_event(McuEvent::Custom(event)));
         }
 
-        fn image_size(
-            &'static self,
-            image: &i_slint_core::graphics::Image,
-        ) -> i_slint_core::graphics::IntSize {
-            let inner: &ImageInner = image.into();
-            match inner {
-                ImageInner::None => Default::default(),
-                ImageInner::EmbeddedImage { buffer, .. } => buffer.size(),
-                ImageInner::StaticTextures(StaticTextures { original_size, .. }) => *original_size,
-            }
-        }
-
         #[cfg(feature = "std")]
         fn register_font_from_memory(
             &'static self,

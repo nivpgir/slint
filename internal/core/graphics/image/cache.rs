@@ -14,7 +14,7 @@ pub enum ImageCacheKey {
 
 // Cache used to avoid repeatedly decoding images from disk.
 #[derive(Default)]
-pub(crate) struct ImageCache(HashMap<ImageCacheKey, SharedImageBuffer>);
+pub(crate) struct ImageCache(HashMap<ImageCacheKey, ImageInner>);
 
 thread_local!(pub(crate) static IMAGE_CACHE: core::cell::RefCell<ImageCache>  = Default::default());
 
@@ -24,33 +24,16 @@ impl ImageCache {
     fn lookup_image_in_cache_or_create(
         &mut self,
         cache_key: ImageCacheKey,
-        image_create_fn: impl Fn() -> Option<image::DynamicImage>,
-    ) -> Option<SharedImageBuffer> {
+        image_create_fn: impl Fn() -> Option<ImageInner>,
+    ) -> Option<ImageInner> {
         Some(match self.0.entry(cache_key) {
             std::collections::hash_map::Entry::Occupied(existing_entry) => {
                 existing_entry.get().clone()
             }
             std::collections::hash_map::Entry::Vacant(vacant_entry) => {
-                let dynamic_image = image_create_fn()?;
-
-                let shared_image_buffer = if dynamic_image.color().has_alpha() {
-                    let rgba8image = dynamic_image.to_rgba8();
-                    SharedImageBuffer::RGBA8(SharedPixelBuffer::clone_from_slice(
-                        rgba8image.as_raw(),
-                        rgba8image.width(),
-                        rgba8image.height(),
-                    ))
-                } else {
-                    let rgb8image = dynamic_image.to_rgb8();
-                    SharedImageBuffer::RGB8(SharedPixelBuffer::clone_from_slice(
-                        rgb8image.as_raw(),
-                        rgb8image.width(),
-                        rgb8image.height(),
-                    ))
-                };
-
-                vacant_entry.insert(shared_image_buffer.clone());
-                shared_image_buffer
+                let new_image = image_create_fn()?;
+                vacant_entry.insert(new_image.clone());
+                new_image
             }
         })
     }
@@ -61,15 +44,34 @@ impl ImageCache {
         }
         let cache_key = ImageCacheKey::from(path.clone());
         self.lookup_image_in_cache_or_create(cache_key, || {
+            if cfg!(feature = "svg") {
+                if path.ends_with(".svg") || path.ends_with(".svgz") {
+                    return Some(ImageInner::Svg(
+                        super::svg::load_from_path(std::path::Path::new(&path.as_str()))
+                            .map_or_else(
+                                |err| {
+                                    eprintln!("Error loading SVG from {}: {}", &path, err);
+                                    None
+                                },
+                                Some,
+                            )?,
+                    ));
+                }
+            }
+
             image::open(std::path::Path::new(&path.as_str())).map_or_else(
                 |decode_err| {
                     eprintln!("Error loading image from {}: {}", &path, decode_err);
                     None
                 },
-                Some,
+                |image| {
+                    Some(ImageInner::EmbeddedImage {
+                        path: path.clone(),
+                        buffer: dynamic_image_to_shared_image_buffer(image),
+                    })
+                },
             )
         })
-        .map(|buffer| ImageInner::EmbeddedImage { path: path.clone(), buffer })
     }
 
     pub(crate) fn load_image_from_embedded_data(
@@ -79,6 +81,19 @@ impl ImageCache {
     ) -> Option<ImageInner> {
         let cache_key = ImageCacheKey::from(by_address::ByAddress(data.as_slice()));
         self.lookup_image_in_cache_or_create(cache_key, || {
+            #[cfg(feature = "svg")]
+            if format.as_slice() == b"svg" || format.as_slice() == b"svgz" {
+                return Some(ImageInner::Svg(
+                    super::svg::load_from_data(data.as_slice()).map_or_else(
+                        |svg_err| {
+                            eprintln!("Error loading SVG: {}", svg_err);
+                            None
+                        },
+                        Some,
+                    )?,
+                ));
+            }
+
             let format = std::str::from_utf8(format.as_slice())
                 .ok()
                 .and_then(image::ImageFormat::from_extension);
@@ -89,13 +104,33 @@ impl ImageCache {
             };
 
             match maybe_image {
-                Ok(image) => Some(image),
+                Ok(image) => Some(ImageInner::EmbeddedImage {
+                    path: Default::default(),
+                    buffer: dynamic_image_to_shared_image_buffer(image),
+                }),
                 Err(decode_err) => {
                     eprintln!("Error decoding embedded image: {}", decode_err);
                     None
                 }
             }
         })
-        .map(|buffer| ImageInner::EmbeddedImage { path: Default::default(), buffer })
+    }
+}
+
+fn dynamic_image_to_shared_image_buffer(dynamic_image: image::DynamicImage) -> SharedImageBuffer {
+    if dynamic_image.color().has_alpha() {
+        let rgba8image = dynamic_image.to_rgba8();
+        SharedImageBuffer::RGBA8(SharedPixelBuffer::clone_from_slice(
+            rgba8image.as_raw(),
+            rgba8image.width(),
+            rgba8image.height(),
+        ))
+    } else {
+        let rgb8image = dynamic_image.to_rgb8();
+        SharedImageBuffer::RGB8(SharedPixelBuffer::clone_from_slice(
+            rgb8image.as_raw(),
+            rgb8image.width(),
+            rgb8image.height(),
+        ))
     }
 }

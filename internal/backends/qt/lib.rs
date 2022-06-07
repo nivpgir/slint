@@ -291,23 +291,4 @@ impl i_slint_core::backend::Backend for Backend {
             }}
         };
     }
-
-    fn image_size(&'static self, _image: &Image) -> IntSize {
-        #[cfg(not(no_qt))]
-        {
-            let inner: &ImageInner = _image.into();
-            match inner {
-                i_slint_core::ImageInner::None => Default::default(),
-                i_slint_core::ImageInner::EmbeddedImage { buffer, .. } => buffer.size(),
-                _ => qt_window::load_image_from_resource(inner, None, ImageFit::fill)
-                    .map(|img| {
-                        let qsize = img.size();
-                        euclid::size2(qsize.width, qsize.height)
-                    })
-                    .unwrap_or_default(),
-            }
-        }
-        #[cfg(no_qt)]
-        Default::default()
-    }
 }

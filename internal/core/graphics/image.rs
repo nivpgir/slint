@@ -252,26 +252,13 @@ pub enum ImageInner {
         path: SharedString, // Should be Option, but can't be because of cbindgen, so empty means none.
         buffer: SharedImageBuffer,
     },
+    Svg(svg::ParsedSVG),
     StaticTextures(&'static StaticTextures),
 }
 
 impl Default for ImageInner {
     fn default() -> Self {
         ImageInner::None
-    }
-}
-
-impl ImageInner {
-    /// Returns true if the image is a scalable vector image.
-    pub fn is_svg(&self) -> bool {
-        match self {
-            // TODO: SVG tree variant
-            //ImageInner::AbsoluteFilePath(path) => path.ends_with(".svg") || path.ends_with(".svgz"),
-            //ImageInner::EmbeddedData { format, .. } => {
-            //    format.as_slice() == b"svg" || format.as_slice() == b"svgz"
-            //}
-            _ => false,
-        }
     }
 }
 
@@ -413,6 +400,7 @@ impl Image {
             ImageInner::None => Default::default(),
             ImageInner::EmbeddedImage { buffer, .. } => buffer.size(),
             ImageInner::StaticTextures(StaticTextures { original_size, .. }) => *original_size,
+            ImageInner::Svg(svg) => svg.size(),
         }
     }
 

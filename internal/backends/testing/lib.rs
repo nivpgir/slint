@@ -55,15 +55,6 @@ impl i_slint_core::backend::Backend for TestingBackend {
         // The event will never be invoked
     }
 
-    fn image_size(&'static self, image: &Image) -> IntSize {
-        let inner: &ImageInner = image.into();
-        match inner {
-            ImageInner::None => Default::default(),
-            ImageInner::EmbeddedImage { buffer, .. } => buffer.size(),
-            ImageInner::StaticTextures(StaticTextures { original_size, .. }) => *original_size,
-        }
-    }
-
     fn duration_since_start(&'static self) -> core::time::Duration {
         // The slint::testing::mock_elapsed_time updates the animation tick directly
         core::time::Duration::from_millis(i_slint_core::animations::current_tick().0)

@@ -444,13 +444,4 @@ impl i_slint_core::backend::Backend for SimulatorBackend {
             .unwrap()
             .send_event(self::event_loop::CustomEvent::UserEvent(event));
     }
-
-    fn image_size(&'static self, image: &Image) -> i_slint_core::graphics::IntSize {
-        let inner: &ImageInner = image.into();
-        match inner {
-            ImageInner::None => Default::default(),
-            ImageInner::EmbeddedImage { buffer, .. } => buffer.size(),
-            ImageInner::StaticTextures(StaticTextures { original_size, .. }) => *original_size,
-        }
-    }
 }
