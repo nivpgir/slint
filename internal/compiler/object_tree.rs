@@ -217,6 +217,8 @@ pub struct Component {
     pub embedded_file_resources:
         RefCell<HashMap<String, crate::embedded_resources::EmbeddedResources>>,
 
+    pub resource_embedding_kind: Cell<Option<crate::EmbedResourcesKind>>,
+
     /// The layout constraints of the root item
     pub root_constraints: RefCell<LayoutConstraints>,
 

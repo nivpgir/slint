@@ -9,3 +9,5 @@ link_args = [
 link_search_path = [
     "."
 ]
+
+collect_resources_in_disk_image = true

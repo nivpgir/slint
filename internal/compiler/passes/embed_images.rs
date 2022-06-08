@@ -86,7 +86,11 @@ fn embed_image(
             if let Some(file) = crate::fileaccess::load_file(std::path::Path::new(path)) {
                 let mut kind = EmbeddedResourcesKind::RawData;
                 #[cfg(not(target_arch = "wasm32"))]
-                if embed_files == EmbedResourcesKind::EmbedTextures {
+                if matches!(
+                    embed_files,
+                    EmbedResourcesKind::EmbedTextures
+                        | EmbedResourcesKind::EmbedTexturesInDiskImage,
+                ) {
                     match load_image(file, _scale_factor) {
                         Ok((img, original_size)) => {
                             kind = EmbeddedResourcesKind::TextureData(generate_texture(

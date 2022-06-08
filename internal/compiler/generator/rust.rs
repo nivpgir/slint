@@ -144,12 +144,12 @@ pub fn generate(doc: &Document) -> TokenStream {
         .embedded_file_resources
         .borrow()
         .iter()
-        .map(|(path, er)| {
+        .filter_map(|(path, er)| {
             let symbol = format_ident!("SLINT_EMBEDDED_RESOURCE_{}", er.id);
             match &er.kind {
                 crate::embedded_resources::EmbeddedResourcesKind::RawData => {
                     let data = embedded_file_tokens(path);
-                    quote!(const #symbol: &'static [u8] = #data;)
+                    Some(quote!(const #symbol: &'static [u8] = #data;))
                 }
                 crate::embedded_resources::EmbeddedResourcesKind::TextureData(crate::embedded_resources::Texture {
                     data, format, rect,
@@ -162,21 +162,37 @@ pub fn generate(doc: &Document) -> TokenStream {
                     } else {
                         quote!(slint::re_exports::Color::from_argb_encoded(0))
                     };
-                    quote!(
-                        const #symbol: slint::re_exports::ImageInner = slint::re_exports::ImageInner::StaticTextures(&slint::re_exports::StaticTextures{
-                            size: slint::re_exports::IntSize::new(#width as _, #height as _),
-                            original_size: slint::re_exports::IntSize::new(#unscaled_width as _, #unscaled_height as _),
-                            data: Slice::from_slice(&[#(#data),*]),
-                            textures: Slice::from_slice(&[
-                                slint::re_exports::StaticTexture {
-                                    rect: slint::re_exports::euclid::rect(#r_x as _, #r_y as _, #r_w as _, #r_h as _),
-                                    format: #format,
-                                    color: #color,
-                                    index: 0,
-                                }
-                            ])
-                        });
-                    )
+
+                    if matches!(
+                        doc.root_component.resource_embedding_kind.get(),
+                        Some(crate::EmbedResourcesKind::EmbedTexturesInDiskImage)
+                    ) {
+                        let asset_path = format!("{}.tex", er.id);
+                        return Some(quote!(
+                            fn #symbol() -> slint::re_exports::ImageInner {
+                                slint::re_exports::ImageInner::AbsoluteFilePath(slint::re_exports::SharedString::from(#asset_path))
+                            }
+                        ));
+                    }
+
+                    Some(quote!(
+                        fn #symbol() -> slint::re_exports::ImageInner {
+                            const #symbol: slint::re_exports::ImageInner = slint::re_exports::ImageInner::StaticTextures(&slint::re_exports::StaticTextures{
+                                size: slint::re_exports::IntSize::new(#width as _, #height as _),
+                                original_size: slint::re_exports::IntSize::new(#unscaled_width as _, #unscaled_height as _),
+                                data: Slice::from_slice(&[#(#data),*]),
+                                textures: Slice::from_slice(&[
+                                    slint::re_exports::StaticTexture {
+                                        rect: slint::re_exports::euclid::rect(#r_x as _, #r_y as _, #r_w as _, #r_h as _),
+                                        format: #format,
+                                        color: #color,
+                                        index: 0,
+                                    }
+                                ])
+                            });
+                            #symbol.clone()
+                        }
+                    ))
                 },
                 crate::embedded_resources::EmbeddedResourcesKind::BitmapFontData(crate::embedded_resources::BitmapFont { family_name, character_map, units_per_em, ascent, descent, glyphs }) => {
 
@@ -204,7 +220,7 @@ pub fn generate(doc: &Document) -> TokenStream {
                         )
                     });
 
-                    quote!(
+                    Some(quote!(
                         const #symbol: slint::re_exports::BitmapFont = slint::re_exports::BitmapFont {
                             family_name: Slice::from_slice(#family_name.as_bytes()),
                             character_map: Slice::from_slice(&[#(#character_map),*]),
@@ -213,7 +229,7 @@ pub fn generate(doc: &Document) -> TokenStream {
                             descent: #descent,
                             glyphs: Slice::from_slice(&[#(#glyphs),*])
                         };
-                    )
+                    ))
                 },
             }
         }).collect::<Vec<_>>();
@@ -1723,7 +1739,7 @@ fn compile_expression(expr: &Expression, ctx: &EvaluationContext) -> TokenStream
             crate::expression_tree::ImageReference::EmbeddedTexture { resource_id } => {
                 let symbol = format_ident!("SLINT_EMBEDDED_RESOURCE_{}", resource_id);
                 quote!(
-                    slint::re_exports::Image::from(#symbol)
+                    slint::re_exports::Image::from(#symbol())
                 )
             }
         },

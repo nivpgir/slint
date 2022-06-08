@@ -52,7 +52,7 @@ compile_error!(
 
 use std::env;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use i_slint_compiler::diagnostics::BuildDiagnostics;
 use i_slint_compiler::EmbedResourcesKind;
@@ -186,8 +186,9 @@ pub fn compile_with_config(
     path: impl AsRef<std::path::Path>,
     config: CompilerConfiguration,
 ) -> Result<(), CompileError> {
-    let path = Path::new(&env::var_os("CARGO_MANIFEST_DIR").ok_or(CompileError::NotRunViaCargo)?)
-        .join(path.as_ref());
+    let cargo_manifest_dir: PathBuf =
+        env::var_os("CARGO_MANIFEST_DIR").ok_or(CompileError::NotRunViaCargo)?.into();
+    let path = cargo_manifest_dir.join(path.as_ref());
 
     let mut diag = BuildDiagnostics::default();
     let syntax_node = i_slint_compiler::parser::parse_file(&path, &mut diag);
@@ -201,7 +202,18 @@ pub fn compile_with_config(
     let mut compiler_config = config.config;
 
     if env::var_os("DEP_I_SLINT_BACKEND_MCU_EMBED_TEXTURES").is_some() {
-        compiler_config.embed_resources = EmbedResourcesKind::EmbedTextures;
+        if board_config()
+            .ok()
+            .flatten()
+            .and_then(|(_, toml)| {
+                toml.get("collect_resources_in_disk_image").and_then(|value| value.as_bool())
+            })
+            .unwrap_or_default()
+        {
+            compiler_config.embed_resources = EmbedResourcesKind::EmbedTexturesInDiskImage;
+        } else {
+            compiler_config.embed_resources = EmbedResourcesKind::EmbedTextures;
+        }
     } else if let (Ok(target), Ok(host)) = (env::var("TARGET"), env::var("HOST")) {
         if target != host {
             compiler_config.embed_resources = EmbedResourcesKind::EmbedAllResources;
@@ -249,6 +261,14 @@ pub fn compile_with_config(
     let mut code_formatter = CodeFormatter { indentation: 0, in_string: false, sink: file };
     let generated = i_slint_compiler::generator::rust::generate(&doc);
 
+    if matches!(
+        doc.root_component.resource_embedding_kind.get(),
+        Some(i_slint_compiler::EmbedResourcesKind::EmbedTexturesInDiskImage)
+    ) {
+        i_slint_compiler::resourcearchive::archive_resources(&cargo_manifest_dir, &doc)
+            .map_err(CompileError::SaveError)?;
+    }
+
     for x in &diag.all_loaded_files {
         if x.is_absolute() {
             println!("cargo:rerun-if-changed={}", x.display());
@@ -280,15 +300,24 @@ pub fn compile_with_config(
     Ok(())
 }
 
-/// This function is for use the application's build script, in order to print any device specific
-/// build flags reported by the backend
-pub fn print_rustc_flags() -> std::io::Result<()> {
+fn board_config() -> std::io::Result<Option<(PathBuf, toml_edit::Document)>> {
     if let Some(board_config_path) =
         std::env::var_os("DEP_I_SLINT_BACKEND_MCU_BOARD_CONFIG_PATH").map(std::path::PathBuf::from)
     {
         let config = std::fs::read_to_string(board_config_path.as_path())?;
-        let toml = config.parse::<toml_edit::Document>().expect("invalid board config toml");
+        Ok(Some((
+            board_config_path,
+            config.parse::<toml_edit::Document>().expect("invalid board config toml"),
+        )))
+    } else {
+        Ok(None)
+    }
+}
 
+/// This function is for use the application's build script, in order to print any device specific
+/// build flags reported by the backend
+pub fn print_rustc_flags() -> std::io::Result<()> {
+    if let Some((board_config_path, toml)) = board_config()? {
         for link_arg in
             toml.get("link_args").and_then(toml_edit::Item::as_array).into_iter().flatten()
         {

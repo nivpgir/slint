@@ -30,6 +30,7 @@ pub mod lookup;
 pub mod namedreference;
 pub mod object_tree;
 pub mod parser;
+pub mod resourcearchive;
 pub mod typeloader;
 pub mod typeregister;
 
@@ -44,6 +45,8 @@ pub enum EmbedResourcesKind {
     EmbedAllResources,
     /// Embed raw texture (process images and fonts)
     EmbedTextures,
+    /// Embed raw textures (process images and fonts) and write into separate assets disk image.
+    EmbedTexturesInDiskImage,
 }
 
 /// CompilationConfiguration allows configuring different aspects of the compiler.

@@ -265,6 +265,7 @@ fn duplicate_sub_component(
                 .collect(),
         ),
         embedded_file_resources: component_to_duplicate.embedded_file_resources.clone(),
+        resource_embedding_kind: component_to_duplicate.resource_embedding_kind.clone(),
         root_constraints: component_to_duplicate.root_constraints.clone(),
         child_insertion_point: component_to_duplicate.child_insertion_point.clone(),
         setup_code: component_to_duplicate.setup_code.clone(),

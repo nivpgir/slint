@@ -51,6 +51,9 @@ dunce = "1.0.1"
 linked_hash_set = "0.1.4"
 fontdb = { version = "0.9.0", features = ["fontconfig"] }
 fontdue = { version = "0.7.1" }
+zip = { version = "0.5", default-features = false }
+tempfile = "3"
+byteorder = "1"
 
 # for processing and embedding the rendered image (texture)
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
