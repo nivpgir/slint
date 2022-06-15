@@ -108,6 +108,7 @@ mod the_backend {
         self_weak: Weak<Window>,
         background_color: Cell<Color>,
         initial_dirty_region_for_next_frame: Cell<i_slint_core::item_rendering::DirtyRegion>,
+        renderer_state_from_previous_frame: Cell<Option<renderer::RendererState>>,
     }
 
     impl PlatformWindow for McuWindow {
@@ -345,13 +346,15 @@ mod the_backend {
                     dirty_region: PhysicalRect::default(),
                 };
 
-                LINE_RENDERER.with(|renderer| {
+                let state = LINE_RENDERER.with(|renderer| {
                     renderer.borrow().render(
                         runtime_window,
                         window.initial_dirty_region_for_next_frame.take(),
+                        window.renderer_state_from_previous_frame.take(),
                         buffer_provider,
                     )
                 });
+                window.renderer_state_from_previous_frame.set(Some(state));
             });
         }
     }
@@ -364,6 +367,7 @@ mod the_backend {
                     self_weak: window.clone(),
                     background_color: Color::from_rgb_u8(0, 0, 0).into(),
                     initial_dirty_region_for_next_frame: Default::default(),
+                    renderer_state_from_previous_frame: Default::default(),
                 })
             })
         }

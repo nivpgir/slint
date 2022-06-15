@@ -21,6 +21,11 @@ pub use draw_functions::TargetPixel;
 
 type DirtyRegion = PhysicalRect;
 
+#[derive(Default)]
+pub struct RendererState {
+    pub num_scene_items: usize,
+}
+
 pub trait LineBufferProvider {
     /// The pixel type of the buffer
     type TargetPixel: TargetPixel;
@@ -60,8 +65,9 @@ impl LineRenderer {
         &self,
         window: Rc<crate::window::Window>,
         initial_dirty_region: crate::item_rendering::DirtyRegion,
+        renderer_state_from_previous_frame: Option<RendererState>,
         line_buffer: impl LineBufferProvider,
-    ) {
+    ) -> RendererState {
         let component_rc = window.component();
         let component = crate::component::ComponentRc::borrow_pin(&component_rc);
         if let Some(window_item) = crate::items::ItemRef::downcast_pin::<crate::items::WindowItem>(
@@ -74,9 +80,12 @@ impl LineRenderer {
                 window_item.background(),
                 size.cast(),
                 initial_dirty_region,
+                renderer_state_from_previous_frame,
                 &self.partial_cache,
                 line_buffer,
-            );
+            )
+        } else {
+            Default::default()
         }
     }
 
@@ -97,11 +106,18 @@ fn render_window_frame(
     background: Color,
     size: PhysicalSize,
     initial_dirty_region: crate::item_rendering::DirtyRegion,
+    renderer_state_from_previous_frame: Option<RendererState>,
     cache: &RefCell<PartialRenderingCache>,
     mut line_buffer: impl LineBufferProvider,
-) {
-    let mut scene =
-        prepare_scene(runtime_window, size, initial_dirty_region, &mut line_buffer, cache);
+) -> RendererState {
+    let mut scene = prepare_scene(
+        runtime_window,
+        size,
+        initial_dirty_region,
+        renderer_state_from_previous_frame,
+        &mut line_buffer,
+        cache,
+    );
 
     let dirty_region = scene.dirty_region;
 
@@ -147,6 +163,8 @@ fn render_window_frame(
             scene.next_line();
         }
     }
+
+    RendererState { num_scene_items: scene.items.len() }
 }
 
 struct Scene {
@@ -368,11 +386,17 @@ fn prepare_scene(
     runtime_window: Rc<crate::window::Window>,
     size: PhysicalSize,
     initial_dirty_region: crate::item_rendering::DirtyRegion,
+    renderer_state_from_previous_frame: Option<RendererState>,
     line_buffer: &mut impl LineBufferProvider,
     cache: &RefCell<PartialRenderingCache>,
 ) -> Scene {
     let factor = ScaleFactor::new(runtime_window.scale_factor());
-    let prepare_scene = PrepareScene::new(size, factor, runtime_window.default_font_properties());
+    let prepare_scene = PrepareScene::new(
+        &renderer_state_from_previous_frame,
+        size,
+        factor,
+        runtime_window.default_font_properties(),
+    );
     let mut renderer =
         crate::item_rendering::PartialRenderer::new(cache, initial_dirty_region, prepare_scene);
 
@@ -416,9 +440,18 @@ struct PrepareScene {
 }
 
 impl PrepareScene {
-    fn new(size: PhysicalSize, scale_factor: ScaleFactor, default_font: FontRequest) -> Self {
+    fn new(
+        renderer_state_from_previous_frame: &Option<RendererState>,
+        size: PhysicalSize,
+        scale_factor: ScaleFactor,
+        default_font: FontRequest,
+    ) -> Self {
         Self {
-            items: vec![],
+            items: Vec::with_capacity(
+                renderer_state_from_previous_frame
+                    .as_ref()
+                    .map_or(0, |state| state.num_scene_items),
+            ),
             rounded_rectangles: vec![],
             textures: vec![],
             state_stack: vec![],

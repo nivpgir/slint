@@ -36,6 +36,7 @@ pub struct SimulatorWindow {
     background_color: Cell<Color>,
     frame_buffer: RefCell<Option<SimulatorDisplay<embedded_graphics::pixelcolor::Rgb888>>>,
     initial_dirty_region_for_next_frame: Cell<DirtyRegion>,
+    renderer_state_from_previous_frame: Cell<Option<crate::renderer::RendererState>>,
 }
 
 impl SimulatorWindow {
@@ -65,6 +66,7 @@ impl SimulatorWindow {
             background_color: Color::from_rgb_u8(0, 0, 0).into(),
             frame_buffer: RefCell::default(),
             initial_dirty_region_for_next_frame: Default::default(),
+            renderer_state_from_previous_frame: Default::default(),
         });
 
         let runtime_window = window_weak.upgrade().unwrap();
@@ -324,16 +326,19 @@ impl WinitWindow for SimulatorWindow {
                     );
                 }
             }
-            super::LINE_RENDERER.with(|renderer| {
+            let state = super::LINE_RENDERER.with(|renderer| {
                 renderer.borrow().render(
                     runtime_window,
                     self.initial_dirty_region_for_next_frame.take(),
+                    self.renderer_state_from_previous_frame.take(),
                     BufferProvider {
                         devices: display,
                         line_buffer: vec![Default::default(); size.width as usize],
                     },
                 )
             });
+
+            self.renderer_state_from_previous_frame.set(Some(state));
 
             let output_image = display
                 .to_rgb_output_image(&embedded_graphics_simulator::OutputSettings::default());
