@@ -156,6 +156,16 @@ impl Window {
     }
 }
 
+#[cfg(feature = "std")]
+unsafe impl raw_window_handle::HasRawWindowHandle for Window {
+    #![allow(unsafe_code)]
+    fn raw_window_handle(&self) -> raw_window_handle::RawWindowHandle {
+        self.0
+            .raw_window_handle()
+            .expect("Current rendering backend does not support RawWindowHandle")
+    }
+}
+
 impl crate::window::WindowHandleAccess for Window {
     fn window_handle(&self) -> &Rc<crate::window::Window> {
         &self.0

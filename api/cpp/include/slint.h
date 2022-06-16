@@ -175,6 +175,11 @@ public:
 
     void request_redraw() const { cbindgen_private::slint_windowrc_request_redraw(&inner); }
 
+    void *window_system_resource(WindowSystemResource resource)
+    {
+        return cbindgen_private::slint_windowrc_window_system_resource(&inner, resource);
+    }
+
 private:
     cbindgen_private::WindowRcOpaque inner;
 };
@@ -614,7 +619,8 @@ protected:
     }
 
     /// Notify the views that the model has been changed and that everything needs to be reloaded
-    void reset() {
+    void reset()
+    {
         model_row_count_dirty_property.mark_dirty();
         tracked_rows.clear();
         model_row_data_dirty_property.mark_dirty();
@@ -776,7 +782,8 @@ class Repeater
                 data[i].state = State::Dirty;
             }
         }
-        void reset() override {
+        void reset() override
+        {
             is_dirty.set(true);
             data.clear();
         }
@@ -862,10 +869,11 @@ public:
     vtable::VWeak<private_api::ComponentVTable> component_at(int i) const
     {
         const auto &x = inner->data.at(i);
-        return vtable::VWeak<private_api::ComponentVTable>{x.ptr->into_dyn()};
+        return vtable::VWeak<private_api::ComponentVTable> { x.ptr->into_dyn() };
     }
 
-    private_api::IndexRange index_range() const {
+    private_api::IndexRange index_range() const
+    {
         return private_api::IndexRange { 0, inner->data.size() };
     }
 

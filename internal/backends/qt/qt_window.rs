@@ -1728,6 +1728,10 @@ impl PlatformWindow for QtWindow {
             }};
         }
     }
+
+    fn raw_window_handle(&self) -> Option<raw_window_handle::RawWindowHandle> {
+        None
+    }
 }
 
 fn accessible_item(item: Option<ItemRc>) -> Option<ItemRc> {

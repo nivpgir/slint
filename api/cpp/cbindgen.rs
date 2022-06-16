@@ -167,6 +167,7 @@ fn gen_corelib(
         "SetRenderingNotifierError",
         "GraphicsAPI",
         "CloseRequestResponse",
+        "WindowSystemResource",
     ];
 
     config.export.exclude = [
@@ -301,6 +302,7 @@ fn gen_corelib(
             "slint_windowrc_set_rendering_notifier",
             "slint_windowrc_request_redraw",
             "slint_windowrc_on_close_requested",
+            "slint_windowrc_window_system_resource",
             "slint_new_path_elements",
             "slint_new_path_events",
             "slint_color_brighter",
