@@ -99,6 +99,73 @@ pub fn init() {
         dp.OCTOSPI2.octospi_hyperbus_unchecked(config, &ccdr.clocks, ccdr.peripheral.OCTOSPI2);
     let hyperram_ptr: *mut u32 = hyperram.init();
 
+    let _ncs = gpiog.pg6.into_alternate::<10>();
+    let _clk = gpiof.pf10.into_alternate::<9>();
+    let _dqs = gpiob.pb2.into_alternate::<10>();
+    let _io0 = gpiod.pd11.into_alternate::<9>();
+    let _io1 = gpiod.pd12.into_alternate::<9>();
+    let _io2 = gpioe.pe2.into_alternate::<9>();
+    let _io3 = gpiod.pd13.into_alternate::<9>();
+    let _io4 = gpiod.pd4.into_alternate::<10>();
+    let _io5 = gpiod.pd5.into_alternate::<10>();
+    let _io6 = gpiog.pg9.into_alternate::<9>();
+    let _io7 = gpiod.pd7.into_alternate::<10>();
+
+    use stm32h7xx_hal::xspi::*;
+
+    // Initialise the OCTOSPI peripheral.
+    let mut octospi =
+        dp.OCTOSPI1.octospi_unchecked(12.MHz(), &ccdr.clocks, ccdr.peripheral.OCTOSPI1);
+
+    octospi.configure_mode(OctospiMode::EightBit).unwrap();
+
+    {
+        let regs = octospi.inner_mut();
+
+        regs.cr.write(|w| w.en().clear_bit());
+
+        // Try to configure registers as per MX25LM51245G_EnableDTRMemoryMappedMode
+
+        regs.ir.write(|w| unsafe { w.instruction().bits(0xEE11) }); // MX25LM51245G_OCTA_READ_DTR_CMD
+
+        regs.ccr.write(|w| unsafe {
+            w.imode()
+                .bits(4)
+                .idtr()
+                .bit(true)
+                .isize()
+                .bits(1)
+                .admode()
+                .bits(4)
+                .addtr()
+                .bit(true)
+                .dmode()
+                .bits(4)
+                .ddtr()
+                .bit(true)
+                .dqse()
+                .bit(true)
+        });
+
+        regs.tcr.write(|w| unsafe { w.dcyc().bits(6) });
+
+        regs.cr.write(|w| unsafe { w.fmode().bits(3) });
+
+        regs.cr.modify(|_, w| w.en().set_bit());
+    }
+
+    let nor_flash_ptr = 0x90000000 as *mut u8;
+    let flash_region = unsafe {
+        core::slice::from_raw_parts_mut(
+            nor_flash_ptr,
+            16 * 1024 * 1024 / core::mem::size_of::<u8>(), // SIZE IS WRONG
+        )
+    };
+    i_slint_core::debug_log!("reading from address {:#?}", nor_flash_ptr);
+    i_slint_core::debug_log!("{}", flash_region[0]);
+    i_slint_core::debug_log!("{}", flash_region[1]);
+    i_slint_core::debug_log!("{}", flash_region[2]);
+
     /*
     let mut led_red = gpioc.pc2.into_push_pull_output();
     led_red.set_low(); // low mean "on"
