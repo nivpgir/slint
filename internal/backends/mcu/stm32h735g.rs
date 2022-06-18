@@ -48,6 +48,13 @@ pub fn init() {
     let rcc = dp.RCC.constrain();
     let ccdr = rcc
         .sys_ck(400.MHz())
+        // numbers adapted from Drivers/BSP/STM32H735G-DK/stm32h735g_discovery_ospi.c
+        // MX_OSPI_ClockConfig
+        .pll2_p_ck(400.MHz() / 5)
+        .pll2_q_ck(400.MHz() / 2)
+        .pll2_r_ck(400.MHz() / 2)
+        // numbers adapted from Drivers/BSP/STM32H735G-DK/stm32h735g_discovery_lcd.c
+        // MX_LTDC_ClockConfig
         .pll3_p_ck(800.MHz() / 2)
         .pll3_q_ck(800.MHz() / 2)
         .pll3_r_ck(800.MHz() / 83)
@@ -59,10 +66,15 @@ pub fn init() {
         ccdr.peripheral.OCTOSPI2.get_kernel_clk_mux(),
         hal::rcc::rec::OctospiClkSel::RCC_HCLK3
     );
+    assert_eq!(
+        ccdr.peripheral.OCTOSPI1.get_kernel_clk_mux(),
+        hal::rcc::rec::OctospiClkSel::RCC_HCLK3
+    );
+
+    let mut delay = Delay::new(cp.SYST, ccdr.clocks);
 
     cp.SCB.invalidate_icache();
     cp.SCB.enable_icache();
-    cp.SCB.enable_dcache(&mut cp.CPUID);
     cp.DWT.enable_cycle_counter();
 
     let gpioa = dp.GPIOA.split(ccdr.peripheral.GPIOA);
@@ -90,7 +102,7 @@ pub fn init() {
 
     let hyperram_size = 16 * 1024 * 1024; // 16 MByte
     let config = hal::xspi::HyperbusConfig::new(80.MHz())
-        .device_size_bytes(24) // 16 Mbyte
+        .device_size_bytes(21) // 16 Mbyte
         .refresh_interval(4.micros())
         .read_write_recovery(4) // 50ns
         .access_initial_latency(6);
@@ -99,23 +111,179 @@ pub fn init() {
         dp.OCTOSPI2.octospi_hyperbus_unchecked(config, &ccdr.clocks, ccdr.peripheral.OCTOSPI2);
     let hyperram_ptr: *mut u32 = hyperram.init();
 
-    let _ncs = gpiog.pg6.into_alternate::<10>();
-    let _clk = gpiof.pf10.into_alternate::<9>();
-    let _dqs = gpiob.pb2.into_alternate::<10>();
-    let _io0 = gpiod.pd11.into_alternate::<9>();
-    let _io1 = gpiod.pd12.into_alternate::<9>();
-    let _io2 = gpioe.pe2.into_alternate::<9>();
-    let _io3 = gpiod.pd13.into_alternate::<9>();
-    let _io4 = gpiod.pd4.into_alternate::<10>();
-    let _io5 = gpiod.pd5.into_alternate::<10>();
-    let _io6 = gpiog.pg9.into_alternate::<9>();
-    let _io7 = gpiod.pd7.into_alternate::<10>();
+    let _ncs = gpiog.pg6.into_alternate::<10>().speed(High).internal_pull_up(true);
+    let _clk = gpiof.pf10.into_alternate::<9>().speed(High).internal_pull_up(true);
+    let _dqs = gpiob.pb2.into_alternate::<10>().speed(High).internal_pull_up(true);
+    let _io0 = gpiod.pd11.into_alternate::<9>().speed(High).internal_pull_up(true);
+    let _io1 = gpiod.pd12.into_alternate::<9>().speed(High).internal_pull_up(true);
+    let _io2 = gpioe.pe2.into_alternate::<9>().speed(High).internal_pull_up(true);
+    let _io3 = gpiod.pd13.into_alternate::<9>().speed(High).internal_pull_up(true);
+    let _io4 = gpiod.pd4.into_alternate::<10>().speed(High).internal_pull_up(true);
+    let _io5 = gpiod.pd5.into_alternate::<10>().speed(High).internal_pull_up(true);
+    let _io6 = gpiog.pg9.into_alternate::<9>().speed(High).internal_pull_up(true);
+    let _io7 = gpiod.pd7.into_alternate::<10>().speed(High).internal_pull_up(true);
 
     use stm32h7xx_hal::xspi::*;
+    use OctospiWord as XW;
 
-    // Initialise the OCTOSPI peripheral.
     let mut octospi =
         dp.OCTOSPI1.octospi_unchecked(12.MHz(), &ccdr.clocks, ccdr.peripheral.OCTOSPI1);
+
+    /*octospi.configure_mode(OctospiMode::OneBit).unwrap();
+
+    // RDID Read Identification. Abuses address as instruction phase, but that
+    // works in SPI mode.
+    let mut read: [u8; 3] = [0; 3];
+    octospi.read(0x9F, &mut read).unwrap();
+    i_slint_core::debug_log!("Read with instruction 0x9F : {:x?}", read);*/
+
+    // Switch Macronix MX25LM51245GXDI00 to DTR OPI
+    octospi.configure_mode(OctospiMode::EightBit).unwrap();
+
+    const MX25LM51245G_OCTA_READ_DTR_CMD: u16 = 0xEE11;
+    const MX25LM51245G_OCTA_PAGE_PROG_CMD: u16 = 0x12ED;
+    const MX25LM51245G_OCTA_WRITE_ENABLE_CMD: u16 = 0x06F9;
+    const MX25LM51245G_OCTA_READ_STATUS_REG_CMD: u16 = 0x05FA;
+    const MX25LM51245G_AUTOPOLLING_INTERVAL_TIME: u16 = 0x10;
+    const MX25LM51245G_OCTA_READ_CFG_REG2_CMD: u16 = 0x718E;
+    const MX25LM51245G_OCTA_WRITE_CFG_REG2_CMD: u16 = 0x728D;
+    const MX25LM51245G_CR2_REG1_ADDR: u32 = 0x00000000;
+    const MX25LM51245G_CR2_REG3_ADDR: u32 = 0x00000300;
+    const MX25LM51245G_CR2_DC_6_CYCLES: u8 = 0x7;
+    const MX25LM51245G_CR2_DOPI: u8 = 0x2;
+    const MX25LM51245G_WRITE_REG_MAX_TIME: u8 = 40;
+    #[allow(non_snake_case)]
+    fn MX25LM51245G_WriteEnable(octospi: &mut hal::xspi::Octospi<pac::OCTOSPI1>) {
+        octospi
+            .write_extended(XW::U16(MX25LM51245G_OCTA_WRITE_ENABLE_CMD), XW::None, XW::None, &[])
+            .unwrap();
+
+        octospi
+            .write_extended(XW::U16(MX25LM51245G_OCTA_READ_STATUS_REG_CMD), XW::None, XW::None, &[])
+            .unwrap();
+
+        HAL_OSPI_AutoPolling(octospi);
+    }
+    #[allow(non_snake_case)]
+    fn HAL_OSPI_AutoPolling(octospi: &mut hal::xspi::Octospi<pac::OCTOSPI1>) {
+        unsafe {
+            let regs = octospi.inner_mut();
+            let ar = regs.ar.read().address().bits();
+            let ir = regs.ir.read().instruction().bits();
+            regs.psmar.write(|w| w.match_().bits(2));
+            regs.psmkr.write(|w| w.mask().bits(2));
+            regs.pir.write(|w| w.interval().bits(MX25LM51245G_AUTOPOLLING_INTERVAL_TIME));
+            regs.cr.modify(|_, w| w.pmm().clear_bit().apms().set_bit().fmode().bits(2));
+            if regs.ccr.read().admode().bits() != 0 {
+                regs.ar.write(|w| w.address().bits(ar));
+            } else {
+                regs.ir.write(|w| w.instruction().bits(ir));
+            }
+            while !regs.sr.read().smf().bit() {}
+            regs.fcr.write(|w| w.csmf().set_bit());
+            while regs.sr.read().busy().bit() {}
+        }
+    }
+
+    // BSP_OSPI_NOR_ConfigFlash - OSPI_NOR_EnterDOPIMode
+    MX25LM51245G_WriteEnable(&mut octospi);
+    octospi
+        .write_extended(
+            XW::U16(MX25LM51245G_OCTA_WRITE_CFG_REG2_CMD),
+            XW::U32(MX25LM51245G_CR2_REG3_ADDR),
+            XW::None,
+            &[MX25LM51245G_CR2_DC_6_CYCLES],
+        )
+        .unwrap();
+
+    MX25LM51245G_WriteEnable(&mut octospi);
+    octospi
+        .write_extended(
+            XW::U16(MX25LM51245G_OCTA_WRITE_CFG_REG2_CMD),
+            XW::U32(MX25LM51245G_CR2_REG1_ADDR),
+            XW::None,
+            &[MX25LM51245G_CR2_DOPI],
+        )
+        .unwrap();
+    delay.delay_ms(MX25LM51245G_WRITE_REG_MAX_TIME);
+
+    // HAL_OSPI_Init
+    unsafe {
+        let regs = octospi.inner_mut();
+        regs.dcr1.modify(|_, w| {
+            w.mtyp()
+                .bits(1)
+                .devsize()
+                .bits(24) // 512M
+                .csht()
+                .bits(2 - 1)
+                .frck()
+                .clear_bit()
+                .dlybyp()
+                .clear_bit()
+                .ckmode()
+                .clear_bit()
+        });
+        regs.dcr2.modify(|_, w| w.wrapsize().bits(0));
+        regs.dcr3.modify(|_, w| w.csbound().bits(0).maxtran().bits(0));
+        regs.dcr4.write(|w| w.refresh().bits(0));
+        regs.cr.modify(|_, w| w.fthres().bits(4 - 1));
+        while regs.sr.read().busy().bit() {}
+        regs.dcr2.modify(|_, w| w.prescaler().bits(2 - 1));
+        regs.cr.modify(|_, w| w.dqm().clear_bit());
+        regs.tcr.modify(|_, w| w.sshift().clear_bit().dhqc().set_bit());
+        regs.cr.modify(|_, w| w.en().set_bit());
+    }
+
+    // MX25LM51245G_AutoPollingMemReady
+    octospi
+        .write_extended(XW::U16(MX25LM51245G_OCTA_READ_STATUS_REG_CMD), XW::None, XW::None, &[])
+        .unwrap();
+    HAL_OSPI_AutoPolling(&mut octospi);
+
+    let mut read: [u8; 1] = [0];
+    octospi
+        .read_extended(
+            XW::U16(MX25LM51245G_OCTA_READ_CFG_REG2_CMD),
+            XW::U32(MX25LM51245G_CR2_REG1_ADDR),
+            XW::None,
+            5,
+            &mut read,
+        )
+        .unwrap();
+
+    assert_eq!(read[0], MX25LM51245G_CR2_DOPI);
+    /*
+    // Set WREN bit
+    octospi.write_extended(XW::U8(0x06), XW::None, XW::None, &[]).unwrap();
+    // Write Configuration Register 2
+    octospi.write_extended(XW::U8(0x72), XW::U32(0), XW::None, &[1]).unwrap();
+    // Change bus mode
+    octospi.configure_mode(OctospiMode::EightBit).unwrap();
+
+    // RDID Read Identification
+    let mut read: [u8; 3] = [0; 3];
+    octospi.read_extended(XW::U16(0x9F60), XW::U32(0), XW::None, 4, &mut read).unwrap();
+    i_slint_core::debug_log!("Read with instruction 0x9F60 : {:x?}", read);
+
+    {
+        // Taken from MX25LM51245G_EnableDTRMemoryMappedMode of the STM32Cube
+
+        octospi
+            .write_extended(XW::U16(MX25LM51245G_OCTA_READ_DTR_CMD), XW::None, XW::None, &[])
+            .unwrap();
+
+        octospi
+            .write_extended(XW::U16(MX25LM51245G_OCTA_PAGE_PROG_CMD), XW::None, XW::None, &[])
+            .unwrap();
+
+        // HAL_OSPI_MemoryMapped
+
+        // octospi.inner_mut().ltpr.write(|w| w.timeout())
+        //    unsafe { octospi.inner_mut().cr.modify(|_, w| w.fmode().bits(3).tcen().clear_bit()) };
+    }*/
+
+    /*
 
     octospi.configure_mode(OctospiMode::EightBit).unwrap();
 
@@ -152,7 +320,7 @@ pub fn init() {
         regs.cr.write(|w| unsafe { w.fmode().bits(3) });
 
         regs.cr.modify(|_, w| w.en().set_bit());
-    }
+    }*/
 
     let nor_flash_ptr = 0x90000000 as *mut u8;
     let flash_region = unsafe {
@@ -172,6 +340,8 @@ pub fn init() {
     let mut led_green = gpioc.pc3.into_push_pull_output();
     led_green.set_low();
     */
+
+    cp.SCB.enable_dcache(&mut cp.CPUID);
 
     #[link_section = ".frame_buffer"]
     static mut FB1: [TargetPixel; DISPLAY_WIDTH * DISPLAY_HEIGHT] =
@@ -220,7 +390,6 @@ pub fn init() {
     let mut lcd_disp_ctrl = gpiod.pd10.into_push_pull_output();
     let mut lcd_bl_ctrl = gpiog.pg15.into_push_pull_output();
 
-    let mut delay = Delay::new(cp.SYST, ccdr.clocks);
     delay.delay_ms(40u8);
     // End LTDC_MspInit
 
