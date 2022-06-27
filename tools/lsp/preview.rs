@@ -99,7 +99,7 @@ pub fn start_ui_event_loop() {
         .run_event_loop(i_slint_core::backend::EventLoopQuitBehavior::QuitOnlyExplicitly);
 }
 
-pub fn quit_ui_event_loop() {
+pub fn quit_ui_event_loop(exit_code: i32) {
     // Wake up the main thread, in case it wasn't woken up earlier. If it wasn't, then don't request
     // a start of the event loop.
     {
@@ -108,8 +108,8 @@ pub fn quit_ui_event_loop() {
         GUI_EVENT_LOOP_NOTIFIER.notify_one();
     }
 
-    i_slint_backend_selector::backend().post_event(Box::new(|| {
-        i_slint_backend_selector::backend().quit_event_loop();
+    i_slint_backend_selector::backend().post_event(Box::new(move || {
+        i_slint_backend_selector::backend().quit_event_loop(exit_code);
     }));
 
     // Make sure then sender channel gets dropped

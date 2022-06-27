@@ -96,7 +96,7 @@ fn main() {
             struct QuitEventLoop;
             impl Drop for QuitEventLoop {
                 fn drop(&mut self) {
-                    preview::quit_ui_event_loop();
+                    preview::quit_ui_event_loop(0);
                 }
             }
             let _quit_ui_loop = QuitEventLoop;
