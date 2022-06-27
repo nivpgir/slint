@@ -2124,6 +2124,9 @@ fn compile_builtin_function_call(
                 slint::re_exports::Color::from_argb_u8(a, r, g, b)
             })
         }
+	BuiltinFunction::CloseWindow => {
+            panic!("handle in the call expression")
+        }
     }
 }
 

@@ -151,7 +151,9 @@ impl i_slint_core::backend::Backend for Backend {
         }
     }
 
-    fn run_event_loop(&'static self, _behavior: i_slint_core::backend::EventLoopQuitBehavior) {
+    fn run_event_loop(&'static self, _behavior: i_slint_core::backend::EventLoopQuitBehavior) -> i32 {
+	#[cfg(no_qt)]
+        panic!("The Qt backend needs Qt");
         #[cfg(not(no_qt))]
         {
             let quit_on_last_window_closed = match _behavior {

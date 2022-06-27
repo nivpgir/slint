@@ -61,7 +61,6 @@ struct Cli {
 }
 
 thread_local! {static CURRENT_INSTANCE: std::cell::RefCell<Option<ComponentInstance>> = Default::default();}
-static EXIT_CODE: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
 
 fn main() -> Result<()> {
     env_logger::init();
@@ -192,11 +191,9 @@ fn init_dialog(instance: &ComponentInstance) {
             _ => continue,
         };
         // this is a dialog, so clicking the "x" should cancel
-        EXIT_CODE.store(1, std::sync::atomic::Ordering::Relaxed);
         instance
             .set_callback(&cb, move |_| {
-                EXIT_CODE.store(exit_code, std::sync::atomic::Ordering::Relaxed);
-                i_slint_backend_selector::backend().quit_event_loop();
+                i_slint_backend_selector::backend().quit_event_loop(exit_code);
                 Default::default()
             })
             .unwrap();

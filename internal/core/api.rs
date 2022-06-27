@@ -241,7 +241,7 @@ pub trait ComponentHandle {
 
     /// This is a convenience function that first calls [`Self::show`], followed by [`crate::run_event_loop()`](fn.run_event_loop.html)
     /// and [`Self::hide`].
-    fn run(&self);
+    fn run(&self) -> i32;
 
     /// This function provides access to instances of global singletons exported in `.slint`.
     /// See [`Global`] for an example how to export and access globals from `.slint` markup.

@@ -349,7 +349,7 @@ pub fn eval_expression(expression: &Expression, local_context: &mut EvalLocalCon
                 if arguments.len() != 2 {
                     panic!("internal error: incorrect argument count to ShowPopupWindow")
                 }
-                sixtyfps_rendering_backend_default::backend().quit_event_loop(eval_expression(&arguments[1], local_context).try_into().unwrap());
+                i_slint_backend_selector::backend().quit_event_loop(eval_expression(&arguments[1], local_context).try_into().unwrap());
                 Value::Void
             }
             Expression::BuiltinFunctionReference(BuiltinFunction::StringIsFloat, _) => {

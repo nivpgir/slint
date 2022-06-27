@@ -72,6 +72,7 @@ thread_local!(pub(crate) static CLIPBOARD : RefCell<ClipboardBackend> = std::cel
 
 thread_local!(pub(crate) static IMAGE_CACHE: RefCell<images::ImageCache> = Default::default());
 
+static EXIT_CODE: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
 pub struct Backend;
 impl i_slint_core::backend::Backend for Backend {
     fn create_window(&'static self) -> Rc<Window> {
@@ -84,11 +85,13 @@ impl i_slint_core::backend::Backend for Backend {
         })
     }
 
-    fn run_event_loop(&'static self, behavior: i_slint_core::backend::EventLoopQuitBehavior) {
+    fn run_event_loop(&'static self, behavior: i_slint_core::backend::EventLoopQuitBehavior) -> i32 {
         crate::event_loop::run(behavior);
+	EXIT_CODE.load(std::sync::atomic::Ordering::SeqCst)
     }
 
-    fn quit_event_loop(&'static self) {
+    fn quit_event_loop(&'static self, _exit_code: i32) {
+	EXIT_CODE.store(_exit_code, std::sync::atomic::Ordering::SeqCst);
         crate::event_loop::with_window_target(|event_loop| {
             event_loop.event_loop_proxy().send_event(crate::event_loop::CustomEvent::Exit).ok();
         })

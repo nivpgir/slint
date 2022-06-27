@@ -2495,6 +2495,9 @@ fn compile_builtin_function_call(
                 panic!("internal error: invalid args to ImplicitLayoutInfo {:?}", arguments)
             }
         }
+	BuiltinFunction::CloseWindow => {
+            panic!("handle in the call expression")
+        }
     }
 }
 
