@@ -93,6 +93,8 @@ fn main() -> Result<()> {
     if let Some(data_path) = args.load_data {
         load_data(&component, &data_path)?;
     }
+
+    install_close_callback(&component);
     install_callbacks(&component, &args.on);
 
     if args.auto_reload {
@@ -181,6 +183,14 @@ fn init_compiler(
         })
     }
     compiler
+}
+
+fn install_close_callback(instance: &ComponentInstance){
+        let instance_weak = instance.as_weak();
+    instance.set_callback("close", move |_args| {
+	instance_weak.upgrade_in_event_loop(|w|w.hide());
+	Default::default()
+    }).unwrap();
 }
 
 fn init_dialog(instance: &ComponentInstance) {
